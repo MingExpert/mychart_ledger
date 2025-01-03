@@ -4,6 +4,10 @@ import sqlite3
 import secrets
 import logging
 from datetime import datetime, timedelta
+from flask_jwt_extended import JWTManager, create_access_token
+from cryptography.fernet import Fernet
+import face_recognition
+import pyttsx
 
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QFrame,
@@ -23,15 +27,19 @@ class LedgerBackend:
     with encryption via Fernet.
     """
     def __init__(self, db_path="secure_ledger.db"):
+        self.security = SecureMyChartLedger()  # Initialize SecureMyChartLedger
+        self.jwt = self.security.jwt           # Use JWTManager
+        self.voice_engine = self.security.voice_engine  # Text-to-speech
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger("LedgerBackend")
 
-        # For production, store the key somewhere safer than in-memory!
         self.key = Fernet.generate_key()
         self.cipher_suite = Fernet(self.key)
         self.db_path = db_path
 
         self.setup_database()
+        self.security.setup_logging()
+
 
     def setup_database(self):
         conn = sqlite3.connect(self.db_path)
@@ -377,22 +385,36 @@ class MyChartLedgerKiosk(QWidget):
     # -----------------------------
     # Button Handlers (login, reset)
     # -----------------------------
+    import requests  # Ensure this is imported at the top of your file
+
     def login_action(self):
         username = self.username_field.text().strip()
         password = self.password_field.text().strip()
+
         if not username or not password:
             QMessageBox.warning(self, "Login Failed", "Please enter your username and password.")
             return
 
-        creds = self.backend.retrieve_credentials(username)
-        if not creds:
-            QMessageBox.warning(self, "Login Failed", f"User '{username}' does not exist.")
-            return
+        try:
+            # Send a GET request to the API
+            response = requests.get(f'http://127.0.0.1:5000/api/retrieve_credentials/{username}')
+            
+            if response.status_code == 404:
+                QMessageBox.warning(self, "Login Failed", f"User '{username}' does not exist.")
+                return
 
-        if creds["password"] == password:
-            QMessageBox.information(self, "Login Successful", "Welcome to MyChart Ledger!")
-        else:
-            QMessageBox.warning(self, "Login Failed", "Incorrect password. Please try again.")
+            if response.status_code != 200:
+                QMessageBox.warning(self, "Error", "An error occurred while communicating with the server.")
+                return
+
+            creds = response.json()
+            if creds.get("password") == password:
+                QMessageBox.information(self, "Login Successful", "Welcome to MyChart Ledger!")
+            else:
+                QMessageBox.warning(self, "Login Failed", "Incorrect password. Please try again.")
+        except requests.exceptions.RequestException as e:
+            QMessageBox.critical(self, "Error", f"Unable to connect to the server: {e}")
+
 
     def reset_action(self):
         user_id, ok = QInputDialog.getText(self, "Password Reset", "Enter your username:")
