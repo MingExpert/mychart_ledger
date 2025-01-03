@@ -5,3 +5,5 @@ flask-jwt-extended
 face_recognition
 pyttsx3
 requests
+face_recognition
+dlib
