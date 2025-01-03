@@ -50,7 +50,7 @@ class LedgerBackend:
                 logging.error(f"Biometric enrollment failed for user {user_id}")
         except Exception as e:
             logging.error(f"Error loading image for {user_id}: {e}")
-            
+
     def setup_database(self):
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
@@ -284,6 +284,10 @@ class MyChartLedgerKiosk(QWidget):
         self.help_btn.clicked.connect(self.help_action)
         frame_layout.addWidget(self.help_btn)
 
+        self.biometric_btn = QPushButton("Enroll Biometric Data")
+        self.biometric_btn.clicked.connect(self.enroll_biometrics)
+        self.layout.addWidget(self.biometric_btn)
+
         # Exit Fullscreen
         self.exit_btn = QPushButton("Exit Fullscreen")
         self.exit_btn.setObjectName("exitButton")
@@ -294,6 +298,13 @@ class MyChartLedgerKiosk(QWidget):
         self.bg_frame.setLayout(frame_layout)
         main_layout.addWidget(self.bg_frame)
         self.setLayout(main_layout)
+
+    def enroll_biometrics(self):
+        user_id, ok = QInputDialog.getText(self, "Enroll Biometric", "Enter your username:")
+        if ok and user_id:
+            image_path, _ = QFileDialog.getOpenFileName(self, "Select Image", "", "Images (*.png *.jpg)")
+            if image_path:
+                self.backend.enroll_user_biometrics(user_id, image_path)
 
     def apply_styles(self):
         """
