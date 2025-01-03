@@ -1,3 +1,7 @@
 PyQt5
 cryptography
+flask
+flask-jwt-extended
+face_recognition
+pyttsx3
 requests
