@@ -28,6 +28,7 @@ class LedgerBackend:
     """
     def __init__(self, db_path="secure_ledger.db"):
         self.security = SecureMyChartLedger()  # Initialize SecureMyChartLedger
+        self.biometric = BiometricAuth()  # Initialize BiometricAuth
         self.jwt = self.security.jwt           # Use JWTManager
         self.voice_engine = self.security.voice_engine  # Text-to-speech
         logging.basicConfig(level=logging.INFO)
@@ -40,7 +41,16 @@ class LedgerBackend:
         self.setup_database()
         self.security.setup_logging()
 
-
+    def enroll_user_biometrics(self, user_id, image_path):
+        try:
+            image = face_recognition.load_image_file(image_path)
+            if self.biometric.enroll_user(user_id, image):
+                logging.info(f"Biometric data enrolled for user {user_id}")
+            else:
+                logging.error(f"Biometric enrollment failed for user {user_id}")
+        except Exception as e:
+            logging.error(f"Error loading image for {user_id}: {e}")
+            
     def setup_database(self):
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
