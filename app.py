@@ -288,6 +288,11 @@ class MyChartLedgerKiosk(QWidget):
         self.biometric_btn.clicked.connect(self.enroll_biometrics)
         self.layout.addWidget(self.biometric_btn)
 
+        # Button for Authentication into the PyQt UI
+        self.biometric_login_btn = QPushButton("Login with Face ID")
+        self.biometric_login_btn.clicked.connect(self.authenticate_biometrics)
+        frame_layout.addWidget(self.biometric_login_btn)
+
         # Exit Fullscreen
         self.exit_btn = QPushButton("Exit Fullscreen")
         self.exit_btn.setObjectName("exitButton")
@@ -299,8 +304,22 @@ class MyChartLedgerKiosk(QWidget):
         main_layout.addWidget(self.bg_frame)
         self.setLayout(main_layout)
 
-    def enroll_biometrics(self):
-        user_id, ok = QInputDialog.getText(self, "Enroll Biometric", "Enter your username:")
+    def authenticate_biometrics(self):
+        # Open a file dialog to select the image for authentication
+        image_path, _ = QFileDialog.getOpenFileName(self, "Select Image", "", "Images (*.png *.jpg)")
+        if not image_path:
+            return  # User canceled
+
+        # Call the backend method to authenticate using biometrics
+        user_id = self.backend.authenticate_user_with_biometrics(image_path)
+        if user_id:
+            QMessageBox.information(self, "Authentication Successful", f"Welcome back, {user_id}!")
+        else:
+            QMessageBox.warning(self, "Authentication Failed", "No matching user found.")
+
+
+        def enroll_biometrics(self):
+            user_id, ok = QInputDialog.getText(self, "Enroll Biometric", "Enter your username:")
         if ok and user_id:
             image_path, _ = QFileDialog.getOpenFileName(self, "Select Image", "", "Images (*.png *.jpg)")
             if image_path:
