@@ -17,13 +17,11 @@ class LedgerBackend:
     def setup_database(self):
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
+        # Add a new table for biometric data if it doesn't exist
         c.execute('''
-            CREATE TABLE IF NOT EXISTS user_credentials (
+            CREATE TABLE IF NOT EXISTS user_biometrics (
                 user_id TEXT PRIMARY KEY,
-                encrypted_username TEXT,
-                encrypted_password TEXT,
-                hint TEXT,
-                biometric_enabled BOOLEAN
+                face_encoding BLOB
             )
         ''')
         conn.commit()
@@ -120,3 +118,66 @@ class LedgerBackend:
         if token == stored_token and datetime.now() < expiry_time:
             return True
         return False
+
+    def enroll_user_biometrics(self, user_id, image_path):
+        try:
+            # Load and process the image
+            image = face_recognition.load_image_file(image_path)
+            face_encodings = face_recognition.face_encodings(image)
+
+            if len(face_encodings) == 0:
+                self.logger.error(f"No face detected in image for user {user_id}")
+                return False
+
+            # Only use the first face encoding found
+            face_encoding = face_encodings[0]
+
+            # Store the face encoding in the database
+            conn = sqlite3.connect(self.db_path)
+            c = conn.cursor()
+            c.execute('''
+                INSERT OR REPLACE INTO user_biometrics (user_id, face_encoding)
+                VALUES (?, ?)
+            ''', (user_id, face_encoding.tobytes()))
+            conn.commit()
+            conn.close()
+
+            self.logger.info(f"Biometric data enrolled for user {user_id}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Error enrolling biometrics for user {user_id}: {e}")
+            return False
+
+    def authenticate_user_with_biometrics(self, image_path):
+        try:
+            # Load and process the image
+            image = face_recognition.load_image_file(image_path)
+            face_encodings = face_recognition.face_encodings(image)
+
+            if len(face_encodings) == 0:
+                self.logger.error("No face detected in image.")
+                return None
+
+            # Only use the first face encoding found
+            input_encoding = face_encodings[0]
+
+            # Retrieve all stored encodings from the database
+            conn = sqlite3.connect(self.db_path)
+            c = conn.cursor()
+            c.execute("SELECT user_id, face_encoding FROM user_biometrics")
+            rows = c.fetchall()
+            conn.close()
+
+            # Compare the input encoding with each stored encoding
+            for user_id, stored_encoding in rows:
+                stored_encoding = face_recognition.face_encodings([stored_encoding])
+                match = face_recognition.compare_faces([stored_encoding], input_encoding)
+                if match[0]:
+                    self.logger.info(f"User authenticated: {user_id}")
+                    return user_id
+
+            self.logger.info("No match found for input image.")
+            return None
+        except Exception as e:
+            self.logger.error(f"Error during biometric authentication: {e}")
+            return None
